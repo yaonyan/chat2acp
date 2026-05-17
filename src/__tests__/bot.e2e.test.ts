@@ -54,6 +54,7 @@ vi.mock("@mcpc-tech/acp-ai-provider", () => ({
 
 import { streamText } from "ai";
 import { createBot } from "../bot.js";
+import { streamWithToolCalls } from "../stream-utils.js";
 
 // ─── 常量 ──────────────────────────────────────────────────────────────────────
 
@@ -105,7 +106,10 @@ describe("createBot e2e — 完整 mention 链路（channel 白名单已配置�
 
     expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({
-        prompt: "帮我写一段 TypeScript 函数",
+        messages: [
+          { role: "user", content: expect.stringContaining("<chat_context>") },
+          { role: "user", content: "帮我写一段 TypeScript 函数" },
+        ],
       })
     );
     expect(mockProvider.languageModel).toHaveBeenCalled();
@@ -137,7 +141,12 @@ describe("createBot e2e — 完整 mention 链路（channel 白名单已配置�
     await chat.handleIncomingMessage(mockAdapter, THREAD_ID, message);
 
     expect(streamText).toHaveBeenCalledWith(
-      expect.objectContaining({ prompt: "" })
+      expect.objectContaining({
+        messages: [
+          { role: "user", content: expect.stringContaining("<chat_context>") },
+          { role: "user", content: "" },
+        ],
+      })
     );
   });
 
@@ -275,7 +284,9 @@ describe("mention handler 核心逻辑（单元）", () => {
 
     expect(mockProvider.languageModel).toHaveBeenCalled();
     expect(streamTextMock).toHaveBeenCalledWith(
-      expect.objectContaining({ prompt: "请解释这段代码" })
+      expect.objectContaining({
+        messages: [{ role: "user", content: "请解释这段代码" }],
+      })
     );
     expect(posts).toEqual(["回复内容"]);
   });
@@ -344,8 +355,8 @@ describe("createBot — slash command registration", () => {
 // ─── helper：构造 streamText 的 mock 返回值 ───────────────────────────────
 function mockStreamText(text: string) {
   return {
-    textStream: (async function* () {
-      yield text;
+    fullStream: (async function* () {
+      yield { type: "text-delta", textDelta: text };
     })(),
   };
 }
@@ -365,14 +376,14 @@ async function invokeHandler(
   } as any;
 
   try {
-    const { textStream } = streamTextFn({
+    const { fullStream } = streamTextFn({
       model: mockProvider.languageModel() as any,
-      prompt: text,
+      messages: [{ role: "user", content: text }],
       tools: mockProvider.tools as any,
     });
     let result = "";
-    for await (const chunk of textStream) {
-      result += chunk;
+    for await (const event of streamWithToolCalls(fullStream)) {
+      result += event;
     }
     await thread.post({ markdown: result });
   } catch {

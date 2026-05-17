@@ -11,6 +11,7 @@ import type { Adapter } from "chat";
 import { resolveAgent, type ACPAgentConfig } from "./agents.config.js";
 import { registerCommands } from "./commands.js";
 import { wrapAdapter } from "./adapters/index.js";
+import { streamWithToolCalls } from "./stream-utils.js";
 
 // ── Chat adapter registry ──────────────────────────────────────────────────
 
@@ -84,6 +85,33 @@ function resolveAdminUserIds(opt?: string[]): Set<string> {
     ? process.env.ADMIN_USER_IDS.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
   return new Set([...(opt ?? []), ...fromEnv]);
+}
+
+// ── XML Chat Context ───────────────────────────────────────────────────────
+
+function escapeXml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function buildChatContext(info: {
+  agentId: string;
+  agentName: string;
+  adapterName: string;
+  botName: string;
+  isDM: boolean;
+  threadId: string;
+  authorId?: string | null;
+  authorName?: string | null;
+  authorFullName?: string | null;
+}): string {
+  return `<chat_context>
+  <agent id="${escapeXml(info.agentId)}" name="${escapeXml(info.agentName)}" />
+  <platform name="${escapeXml(info.adapterName)}" />
+  <bot name="${escapeXml(info.botName)}" />
+  <channel type="${info.isDM ? "dm" : "group"}" />
+  <thread id="${escapeXml(info.threadId)}" />
+  <user id="${escapeXml(info.authorId ?? "")}" name="${escapeXml(info.authorName ?? "")}" full_name="${escapeXml(info.authorFullName ?? "")}" />
+</chat_context>`;
 }
 
 // ── createBot ──────────────────────────────────────────────────────────────
@@ -161,9 +189,24 @@ export function createBot(opts: CreateBotOptions = {}) {
     thread.startTyping();
 
     try {
-      const { textStream } = streamText({
+      const chatContext = buildChatContext({
+        agentId: agentConfig.id,
+        agentName: agentConfig.name,
+        adapterName,
+        botName: chatAdapter.userName,
+        isDM: thread.isDM,
+        threadId: thread.id,
+        authorId: message.author?.userId,
+        authorName: message.author?.userName,
+        authorFullName: message.author?.fullName,
+      });
+
+      const { fullStream } = streamText({
         model: provider.languageModel() as any,
-        prompt: userText,
+        messages: [
+          { role: "user", content: chatContext },
+          { role: "user", content: userText },
+        ],
         tools: provider.tools as any,
         signal: abortController.signal,
       });
@@ -179,7 +222,7 @@ export function createBot(opts: CreateBotOptions = {}) {
         }
       }
 
-      await thread.post(withIdleReset(textStream));
+      await thread.post(withIdleReset(streamWithToolCalls(fullStream)));
     } catch (err) {
       console.error("[ACP] Error:", err);
       const message = abortedByTimeout

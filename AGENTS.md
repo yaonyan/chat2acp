@@ -4,11 +4,14 @@ Grounding document for AI agents working on this codebase. Read this first.
 
 ## What this project does
 
-chat2acp bridges any **chat platform** (Discord, Telegram, Slack, WeChat) to any **ACP-compatible AI agent** (OpenCode, Claude, etc.). When a user @-mentions the bot, their message is forwarded to the AI agent via `generateText()`, and the response is posted back.
+chat2acp bridges any **chat platform** (Discord, Telegram, Slack, WeChat) to any **ACP-compatible AI agent** (OpenCode, Claude, etc.). When a user @-mentions the bot, their message is forwarded to the AI agent via `streamText()`, and the response is streamed back.
 
 ## Architecture
 
 ```
+Chat Platform (Discord/Telegram/Slack/WeChat)
+    │
+    ▼
 Chat Platform (Discord/Telegram/Slack/WeChat)
     │
     ▼
@@ -21,10 +24,13 @@ Chat SDK (`chat` package)  ←  handles messages, mentions, threads
 bot.ts `onNewMention`  ←  single generic handler for all platforms
     │
     ▼
-generateText() from `ai` SDK  ←  uses ACP provider as the language model
+streamText() from `ai` SDK  ←  uses ACP provider as the language model
     │
     ▼
 @mcpc-tech/acp-ai-provider  ←  spawns ACP agent as child process, JSON-RPC 2.0 over stdio
+    │
+    ▼
+streamWithToolCalls()  ←  formats tool calls into code blocks, deduplicates
     │
     ▼
 OpenCode / CodeBuddy / Claude  ←  the actual AI agent (ACP subprocess)
@@ -40,6 +46,7 @@ OpenCode / CodeBuddy / Claude  ←  the actual AI agent (ACP subprocess)
 | `src/agents.config.ts` | **Agent config** — defines `ACPAgentConfig` interface and `AGENTS` registry of 10 ACP-compatible agents. `resolveAgent()` picks via `ACP_AGENT` env var, defaults to OpenCode. |
 | `src/adapters/index.ts` | **Adapter wrapper dispatch** — maps adapter name to platform-specific wrapper. Falls through if no wrapper exists. |
 | `src/adapters/telegram/index.ts` | **Telegram wrapper** — keeps typing indicator alive during streaming (4s interval, stops 2s after last edit). |
+| `src/stream-utils.ts` | **Stream formatter** — `streamWithToolCalls()` wraps the AI SDK `fullStream`, rendering tool calls as code blocks and deduplicating `in_progress` updates. |
 | `src/__tests__/bot.e2e.test.ts` | **Integration tests** — mocks `ai` + `@mcpc-tech/acp-ai-provider`, tests mention handler via `chat.handleIncomingMessage()`. |
 | `src/test-utils.ts` | **Test helpers** — `createMockAdapter`, `createMockState`, `createTestMessage`. |
 
