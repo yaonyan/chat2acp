@@ -26,3 +26,4 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 await startListening(abortController.signal);
+console.log("CHAT2ACP_READY");

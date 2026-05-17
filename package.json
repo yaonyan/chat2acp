@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsup",
-    "dev": "npx tsx --watch src/index.ts",
+    "dev": "npx tsx src/watchdog.ts",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest"

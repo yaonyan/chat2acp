@@ -4,3 +4,4 @@ dist/
 *.env.local
 .weixin-state.json
 nul
+.chat2acp.pid
