@@ -10,6 +10,7 @@ import type { StateAdapter } from "chat";
 import type { Adapter } from "chat";
 import { resolveAgent, type ACPAgentConfig } from "./agents.config.js";
 import { registerCommands } from "./commands.js";
+import { wrapAdapter } from "./adapters/index.js";
 
 // ── Chat adapter registry ──────────────────────────────────────────────────
 
@@ -17,16 +18,14 @@ export const CHAT_ADAPTERS = ["discord", "weixin", "telegram", "slack"] as const
 export type ChatAdapterName = (typeof CHAT_ADAPTERS)[number];
 
 function createChatAdapter(name: ChatAdapterName): Adapter {
+  let adapter: Adapter;
   switch (name) {
-    case "discord":
-      return createDiscordAdapter();
-    case "telegram":
-      return createTelegramAdapter();
-    case "slack":
-      return createSlackAdapter({ mode: "socket" });
-    case "weixin":
-      return new WeixinAdapter();
+    case "discord": adapter = createDiscordAdapter(); break;
+    case "telegram": adapter = createTelegramAdapter(); break;
+    case "slack": adapter = createSlackAdapter({ mode: "socket" }); break;
+    case "weixin": adapter = new WeixinAdapter(); break;
   }
+  return wrapAdapter(name, adapter!);
 }
 
 // ── Command resolution (cross-platform) ────────────────────────────────────
@@ -147,17 +146,50 @@ export function createBot(opts: CreateBotOptions = {}) {
 
     console.log(`[${adapterName}] Received: ${userText}`);
 
+    const abortController = new AbortController();
+    const IDLE_TIMEOUT_MS = parseInt(process.env.ACP_IDLE_TIMEOUT_MS ?? "300000", 10);
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    let abortedByTimeout = false;
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        abortedByTimeout = true;
+        abortController.abort();
+      }, IDLE_TIMEOUT_MS);
+    };
+    resetIdleTimer();
+    thread.startTyping();
+
     try {
-      thread.startTyping();
       const { textStream } = streamText({
         model: provider.languageModel() as any,
         prompt: userText,
         tools: provider.tools as any,
+        signal: abortController.signal,
       });
-      await thread.post(textStream);
+
+      async function* withIdleReset(stream: AsyncIterable<string>) {
+        try {
+          for await (const chunk of stream) {
+            resetIdleTimer();
+            yield chunk;
+          }
+        } finally {
+          if (idleTimer) clearTimeout(idleTimer);
+        }
+      }
+
+      await thread.post(withIdleReset(textStream));
     } catch (err) {
       console.error("[ACP] Error:", err);
-      await thread.post("Something went wrong. Please try again.");
+      const message = abortedByTimeout
+        ? "The AI agent has been idle for a while with no response. Please try again."
+        : "Something went wrong. Please try again.";
+      try {
+        await thread.post(message);
+      } catch (postErr) {
+        console.error("[ACP] Failed to post error message:", postErr);
+      }
     }
   });
 

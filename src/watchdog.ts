@@ -12,8 +12,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { watch } from "node:fs";
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from "node:fs";
+import { watch, mkdirSync, createWriteStream, writeFileSync, readFileSync, unlinkSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const PID_FILE = resolve(process.cwd(), ".chat2acp.pid");
@@ -38,6 +37,21 @@ process.on("exit", () => {
   try { unlinkSync(PID_FILE); } catch {}
 });
 
+// ── Log file ──────────────────────────────────────────────────
+
+const LOG_DIR = resolve(process.cwd(), "logs");
+mkdirSync(LOG_DIR, { recursive: true });
+const logFile = createWriteStream(resolve(LOG_DIR, "bot.log"), { flags: "w" });
+
+function writeLog(msg: string) { logFile.write(msg + "\n"); }
+
+const _log = console.log;
+const _warn = console.warn;
+const _error = console.error;
+console.log = (...args) => { _log(...args); writeLog(args.map(String).join(" ")); };
+console.warn = (...args) => { _warn(...args); writeLog("WARN " + args.map(String).join(" ")); };
+console.error = (...args) => { _error(...args); writeLog("ERR " + args.map(String).join(" ")); };
+
 // ── Spawn child ─────────────────────────────────────────────────────────────
 
 function spawnBot(): ChildProcess {
@@ -52,10 +66,12 @@ function spawnBot(): ChildProcess {
 
   child.stdout?.on("data", (data: Buffer) => {
     process.stdout.write(data);
+    logFile.write(data);
   });
 
   child.stderr?.on("data", (data: Buffer) => {
     process.stderr.write(data);
+    logFile.write(data);
   });
 
   return child;

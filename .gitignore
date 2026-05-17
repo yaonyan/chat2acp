@@ -6,3 +6,4 @@ dist/
 nul
 .chat2acp.pid
 .chat2acp.session
+logs/

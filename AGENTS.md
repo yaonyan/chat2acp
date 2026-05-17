@@ -36,8 +36,10 @@ OpenCode / CodeBuddy / Claude  ←  the actual AI agent (ACP subprocess)
 |------|------|
 | `src/watchdog.ts` | **Parent process** — spawns bot, watches `src/` for changes, hot reloads, auto-restarts on crash. This is what `pnpm dev` runs. |
 | `src/index.ts` | **Bot process** — reads `CHAT_ADAPTER` env var, creates bot, starts listening, prints `CHAT2ACP_READY` to signal watchdog. |
-| `src/bot.ts` | **Bot factory** — `createBot()` builds the ACP provider, chat adapter, and mention handler. Exports `CHAT_ADAPTERS` registry and `CreateBotOptions`. |
+| `src/bot.ts` | **Bot factory** — `createBot()` builds the ACP provider, chat adapter, and chat adapter (via `wrapAdapter()`), and mention handler with idle timeout. Exports `CHAT_ADAPTERS` registry and `CreateBotOptions`. |
 | `src/agents.config.ts` | **Agent config** — defines `ACPAgentConfig` interface and `AGENTS` registry of 10 ACP-compatible agents. `resolveAgent()` picks via `ACP_AGENT` env var, defaults to OpenCode. |
+| `src/adapters/index.ts` | **Adapter wrapper dispatch** — maps adapter name to platform-specific wrapper. Falls through if no wrapper exists. |
+| `src/adapters/telegram/index.ts` | **Telegram wrapper** — keeps typing indicator alive during streaming (4s interval, stops 2s after last edit). |
 | `src/__tests__/bot.e2e.test.ts` | **Integration tests** — mocks `ai` + `@mcpc-tech/acp-ai-provider`, tests mention handler via `chat.handleIncomingMessage()`. |
 | `src/test-utils.ts` | **Test helpers** — `createMockAdapter`, `createMockState`, `createTestMessage`. |
 
@@ -56,6 +58,7 @@ To add a new adapter:
 1. Add to `CHAT_ADAPTERS` array in `bot.ts`
 2. Add a `case` in `createChatAdapter()`
 3. Add env vars to `.env.example`
+4. (Optional) Add platform-specific wrapper in `src/adapters/<name>/` and register in `src/adapters/index.ts`
 
 ## Watchdog — how hot reload works
 
