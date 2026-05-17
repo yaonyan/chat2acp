@@ -24,7 +24,7 @@
     "@chat-adapter/state-memory": "^4.28.1",
     "@chat-adapter/telegram": "^4.28.1",
     "@mcpc-tech/acp-ai-provider": "latest",
-    "@yaonyan/chat-adapter-weixin": "^0.0.2",
+    "@yaonyan/chat-adapter-weixin": "^0.1.1",
     "ai": "^6.0.182",
     "chat": "latest",
     "dotenv": "^17.4.2"
