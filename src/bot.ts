@@ -2,16 +2,34 @@ import { createACPProvider, type ACPProvider } from "@mcpc-tech/acp-ai-provider"
 import { generateText } from "ai";
 import { Chat } from "chat";
 import { createDiscordAdapter, type DiscordAdapter } from "@chat-adapter/discord";
+import { createTelegramAdapter } from "@chat-adapter/telegram";
+import { createSlackAdapter } from "@chat-adapter/slack";
 import { WeixinAdapter } from "@yaonyan/chat-adapter-weixin";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import type { StateAdapter } from "chat";
 import type { Adapter } from "chat";
 import { defaultAgent, type ACPAgentConfig } from "./agents.config.js";
 
-/**
- * On Windows, npm global `.cmd` wrappers can't be spawned without `shell: true`.
- * Instead, resolve the actual executable path directly.
- */
+// ── Chat adapter registry ──────────────────────────────────────────────────
+
+export const CHAT_ADAPTERS = ["discord", "weixin", "telegram", "slack"] as const;
+export type ChatAdapterName = (typeof CHAT_ADAPTERS)[number];
+
+function createChatAdapter(name: ChatAdapterName): Adapter {
+  switch (name) {
+    case "discord":
+      return createDiscordAdapter();
+    case "telegram":
+      return createTelegramAdapter();
+    case "slack":
+      return createSlackAdapter({ mode: "socket" });
+    case "weixin":
+      return new WeixinAdapter();
+  }
+}
+
+// ── Windows command resolution ─────────────────────────────────────────────
+
 function resolveCommand(config: ACPAgentConfig): { command: string; args: string[] } {
   if (process.platform !== "win32") {
     return { command: config.command, args: config.args };
@@ -21,34 +39,23 @@ function resolveCommand(config: ACPAgentConfig): { command: string; args: string
     : `${process.env.USERPROFILE}\\AppData\\Roaming\\npm`;
 
   if (config.command === "opencode") {
-    const script = `${npmPrefix}\\node_modules\\opencode-ai\\bin\\opencode`;
-    return { command: process.execPath, args: [script, ...config.args] };
+    const exe = `${npmPrefix}\\node_modules\\opencode-ai\\bin\\opencode.exe`;
+    return { command: exe, args: config.args };
   }
   const script = `${npmPrefix}\\node_modules\\@tencent-ai\\codebuddy-code\\bin\\${config.command}`;
   return { command: process.execPath, args: [script, ...config.args] };
 }
 
-export type ChatAdapterName = "discord" | "weixin";
+// ── Options ────────────────────────────────────────────────────────────────
 
 export interface CreateBotOptions {
-  /** Which chat adapter to use. Default: "weixin". Env: CHAT_ADAPTER */
   adapter?: ChatAdapterName;
-  /** override the ACP provider (useful for testing) */
   provider?: ACPProvider;
-  /** override the adapter instance (useful for testing) */
   chatAdapter?: Adapter;
-  /** override the state adapter (useful for testing) */
   state?: StateAdapter;
-  /** ACP agent command, default from agents.config.ts */
   command?: string;
-  /** ACP agent args, default from agents.config.ts */
   args?: string[];
-  /**
-   * Discord only: allowed guild channels in addition to DMs.
-   * Format: "guildId:channelId" strings.
-   * If empty, allow all channels.
-   * Env: DISCORD_ALLOWED_CHANNELS (comma-separated).
-   */
+  /** Discord only: allowed guild channels */
   allowedChannels?: string[];
 }
 
@@ -59,10 +66,12 @@ function resolveAllowedChannels(opt?: string[]): Set<string> {
   return new Set([...(opt ?? []), ...fromEnv]);
 }
 
+// ── createBot ──────────────────────────────────────────────────────────────
+
 export function createBot(opts: CreateBotOptions = {}) {
   const adapterName = opts.adapter ?? "weixin";
 
-  // ── ACP provider ────────────────────────────────────────────────────────────
+  // ACP provider
   const agentConfig: ACPAgentConfig = {
     command: opts.command ?? defaultAgent.command,
     args: opts.args ?? defaultAgent.args,
@@ -77,23 +86,13 @@ export function createBot(opts: CreateBotOptions = {}) {
       command,
       args,
       authMethodId: agentConfig.authMethodId,
-      session: {
-        cwd: process.cwd(),
-        mcpServers: [],
-      },
+      session: { cwd: process.cwd(), mcpServers: [] },
       persistSession: agentConfig.persistSession,
       sessionDelayMs: agentConfig.sessionDelayMs,
     });
 
-  // ── Chat adapter (single) ──────────────────────────────────────────────────
-  let chatAdapter: Adapter;
-  if (opts.chatAdapter) {
-    chatAdapter = opts.chatAdapter;
-  } else if (adapterName === "discord") {
-    chatAdapter = createDiscordAdapter();
-  } else {
-    chatAdapter = new WeixinAdapter();
-  }
+  // Chat adapter
+  const chatAdapter = opts.chatAdapter ?? createChatAdapter(adapterName);
 
   const bot = new Chat({
     userName: "chat2acp-bot",
@@ -101,68 +100,49 @@ export function createBot(opts: CreateBotOptions = {}) {
     state: opts.state ?? createMemoryState(),
   });
 
-  // ── Mention handler ─────────────────────────────────────────────────────────
-  if (adapterName === "discord") {
-    const discordAdapter = chatAdapter as DiscordAdapter;
-    const allowedChannels = resolveAllowedChannels(opts.allowedChannels);
+  // ── Generic mention handler ─────────────────────────────────────────────
+  const discordAdapter = adapterName === "discord" ? (chatAdapter as DiscordAdapter) : null;
+  const allowedChannels = resolveAllowedChannels(opts.allowedChannels);
 
-    bot.onNewMention(async (thread, message) => {
+  bot.onNewMention(async (thread, message) => {
+    // Discord channel whitelist
+    if (discordAdapter) {
       const threadId = message.threadId;
-
       if (!discordAdapter.isDM(threadId) && allowedChannels.size > 0) {
         const { guildId, channelId } = discordAdapter.decodeThreadId(threadId);
-        const key = `${guildId}:${channelId}`;
-        if (!allowedChannels.has(key)) {
-          console.log(`[Discord] Ignoring message from unlisted channel: ${key}`);
+        if (!allowedChannels.has(`${guildId}:${channelId}`)) {
+          console.log(`[Discord] Ignoring message from unlisted channel: ${guildId}:${channelId}`);
           return;
         }
       }
+    }
 
-      const userText = message.text ?? "";
-      console.log(`[Discord] Received mention: ${userText}`);
+    const userText = message.text ?? "";
+    console.log(`[${adapterName}] Received: ${userText}`);
 
-      try {
-        const result = await generateText({
-          model: provider.languageModel() as any,
-          prompt: userText,
-          tools: provider.tools as any,
-        });
-        await thread.post(result.text);
-      } catch (err) {
-        console.error("[ACP] Error:", err);
-        await thread.post("Something went wrong. Please try again.");
-      }
-    });
-  } else {
-    bot.onNewMention(async (thread, message) => {
-      const userText = message.text ?? "";
-      console.log(`[WeChat] Received message: ${userText}`);
+    try {
+      const result = await generateText({
+        model: provider.languageModel() as any,
+        prompt: userText,
+        tools: provider.tools as any,
+      });
+      await thread.post(result.text);
+    } catch (err) {
+      console.error("[ACP] Error:", err);
+      await thread.post("Something went wrong. Please try again.");
+    }
+  });
 
-      try {
-        const result = await generateText({
-          model: provider.languageModel() as any,
-          prompt: userText,
-          tools: provider.tools as any,
-        });
-        await thread.post(result.text);
-      } catch (err) {
-        console.error("[ACP] WeChat error:", err);
-        await thread.post("Something went wrong. Please try again.");
-      }
-    });
-  }
-
-  // ── startListening ──────────────────────────────────────────────────────────
+  // ── startListening ──────────────────────────────────────────────────────
   async function startListening(signal?: AbortSignal) {
-    if (adapterName === "discord") {
-      const discordAdapter = chatAdapter as DiscordAdapter;
+    if (adapterName === "discord" && discordAdapter) {
       await discordAdapter.startGatewayListener(
         { waitUntil: (p: Promise<unknown>) => p.catch(() => {}) },
         24 * 60 * 60 * 1000,
         signal,
       );
     }
-    // WeChat adapter starts polling automatically on initialize — nothing extra needed.
+    // Other adapters auto-start on initialize (telegram polling, slack socket, weixin polling)
   }
 
   return { bot, provider, chatAdapter, startListening };

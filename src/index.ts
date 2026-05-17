@@ -8,12 +8,21 @@ await bot.initialize();
 console.log(`chat2acp bot is running... [adapter: ${adapter}]`);
 
 const abortController = new AbortController();
-await startListening(abortController.signal);
 
-process.on("SIGINT", async () => {
-  console.log("Shutting down...");
+// Ensure clean shutdown — abort signal, cleanup provider, shutdown bot, then force exit.
+// Without force exit, Telegram long-polling and Discord gateway connections can keep
+// the process alive, causing duplicate instances when tsx --watch restarts.
+function shutdown() {
   abortController.abort();
   provider.cleanup();
-  await bot.shutdown();
-  process.exit(0);
-});
+  bot.shutdown().finally(() => {
+    process.exit(0);
+  });
+  // Fallback: force exit after 3s if graceful shutdown hangs
+  setTimeout(() => process.exit(0), 3000);
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
+await startListening(abortController.signal);
