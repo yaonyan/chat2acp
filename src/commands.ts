@@ -62,11 +62,12 @@ const statusCmd: Command = {
   adminOnly: false,
   async execute(ctx) {
     const sessionId = ctx.provider.getSessionId();
-    const agent = `${ctx.agentCommand} ${ctx.agentArgs.join(" ")}`.trim();
+    const name = ctx.agentCommand;
+    const cmd = ctx.agentArgs[0] ?? "";
     return {
       markdown: [
         `**Agent Status**`,
-        `- Agent: \`${agent}\``,
+        `- Agent: \`${name}\` (\`${cmd}\`)`,
         `- Adapter: \`${ctx.adapterName}\``,
         `- Session: ${sessionId ? `\`${sessionId}\`` : "none"}`,
       ].join("\n"),

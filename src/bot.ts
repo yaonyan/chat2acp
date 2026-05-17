@@ -8,7 +8,7 @@ import { WeixinAdapter } from "@yaonyan/chat-adapter-weixin";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import type { StateAdapter } from "chat";
 import type { Adapter } from "chat";
-import { defaultAgent, type ACPAgentConfig } from "./agents.config.js";
+import { resolveAgent, type ACPAgentConfig } from "./agents.config.js";
 import { registerCommands } from "./commands.js";
 
 // ── Chat adapter registry ──────────────────────────────────────────────────
@@ -29,22 +29,32 @@ function createChatAdapter(name: ChatAdapterName): Adapter {
   }
 }
 
-// ── Windows command resolution ─────────────────────────────────────────────
+// ── Command resolution (cross-platform) ────────────────────────────────────
 
+/**
+ * Resolve the executable command for spawning the ACP agent.
+ *
+ * On Windows, opencode uses `.exe` directly to avoid `.cmd` wrapper issues
+ * with stdio. All other agents pass through — Windows resolves via PATH.
+ */
 function resolveCommand(config: ACPAgentConfig): { command: string; args: string[] } {
-  if (process.platform !== "win32") {
-    return { command: config.command, args: config.args };
-  }
-  const npmPrefix = process.env.APPDATA
-    ? `${process.env.APPDATA}\\npm`
-    : `${process.env.USERPROFILE}\\AppData\\Roaming\\npm`;
-
-  if (config.command === "opencode") {
+  if (process.platform === "win32" && config.command === "opencode") {
+    const npmPrefix = process.env.APPDATA
+      ? `${process.env.APPDATA}\\npm`
+      : `${process.env.USERPROFILE}\\AppData\\Roaming\\npm`;
     const exe = `${npmPrefix}\\node_modules\\opencode-ai\\bin\\opencode.exe`;
     return { command: exe, args: config.args };
   }
-  const script = `${npmPrefix}\\node_modules\\@tencent-ai\\codebuddy-code\\bin\\${config.command}`;
-  return { command: process.execPath, args: [script, ...config.args] };
+  return { command: config.command, args: config.args };
+}
+
+function pickAgent(opts: CreateBotOptions): ACPAgentConfig {
+  const agent = resolveAgent(opts.agentName);
+  return {
+    ...agent,
+    command: opts.command ?? agent.command,
+    args: opts.args ?? agent.args,
+  };
 }
 
 // ── Options ────────────────────────────────────────────────────────────────
@@ -54,6 +64,7 @@ export interface CreateBotOptions {
   provider?: ACPProvider;
   chatAdapter?: Adapter;
   state?: StateAdapter;
+  agentName?: string;
   command?: string;
   args?: string[];
   /** Discord only: allowed guild channels */
@@ -82,14 +93,9 @@ export function createBot(opts: CreateBotOptions = {}) {
   const adapterName = opts.adapter ?? "weixin";
 
   // ACP provider
-  const agentConfig: ACPAgentConfig = {
-    command: opts.command ?? defaultAgent.command,
-    args: opts.args ?? defaultAgent.args,
-    authMethodId: defaultAgent.authMethodId,
-    persistSession: defaultAgent.persistSession,
-    sessionDelayMs: defaultAgent.sessionDelayMs,
-  };
+  const agentConfig = pickAgent(opts);
   const { command, args } = resolveCommand(agentConfig);
+  console.log(`[ACP] Agent: ${agentConfig.name} (${command} ${args.join(" ")})`);
   const provider =
     opts.provider ??
     createACPProvider({
@@ -155,7 +161,15 @@ export function createBot(opts: CreateBotOptions = {}) {
 
   // ── Admin slash commands ────────────────────────────────────────────────
   const adminUserIds = resolveAdminUserIds(opts.adminUserIds);
-  const { tryDispatchText } = registerCommands({ bot, adminUserIds, provider, adapterName, agentCommand: command, agentArgs: args });
+  const resolvedCmd = `${command} ${args.join(" ")}`;
+  const { tryDispatchText } = registerCommands({
+    bot,
+    adminUserIds,
+    provider,
+    adapterName,
+    agentCommand: agentConfig.name,
+    agentArgs: [resolvedCmd],
+  });
 
   // ── startListening ──────────────────────────────────────────────────────
   async function startListening(signal?: AbortSignal) {

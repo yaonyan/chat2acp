@@ -1,43 +1,107 @@
-/**
- * ACP Agent Configuration
- *
- * Defines available ACP-compatible agents and their spawn settings.
- * The ACP provider spawns the agent as a child process and communicates
- * via JSON-RPC 2.0 over stdin/stdout.
- *
- * @see ACP Registry: https://agentclientprotocol.com/get-started/registry
- * @see Registry JSON: https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json
- * @see ACP Specification: https://agentclientprotocol.com/specification
- * @see @mcpc-tech/acp-ai-provider: https://github.com/mcpc-tech/mcpc/tree/main/packages/acp-ai-provider
- */
-
 export interface ACPAgentConfig {
-  /** Command to spawn the ACP agent (e.g., "opencode", "claude") */
+  name: string;
   command: string;
-  /** Arguments passed to the command (e.g., ["acp"] for opencode's ACP subcommand) */
   args: string[];
-  /**
-   * Authentication method ID used by lazy auth.
-   * Omit or set to undefined to auto-detect from the agent's initialize response.
-   */
   authMethodId?: string;
-  /** Whether to keep the agent process alive between calls (avoids MCP cold-boot) */
   persistSession?: boolean;
-  /** Delay in ms before initializing the connection (useful for agents that load MCP servers async) */
   sessionDelayMs?: number;
+  env?: { key: string; required?: boolean; default?: string }[];
+  npmPackage?: string;
+  installHint?: string;
 }
 
-/**
- * Default ACP agent: OpenCode.
- *
- * OpenCode is an open-source AI coding agent that speaks ACP natively.
- * Run `opencode acp --help` to see all ACP mode options.
- *
- * @see https://opencode.ai
- */
-export const defaultAgent: ACPAgentConfig = {
-  command: "opencode",
-  args: ["acp"],
-  // authMethodId omitted — let opencode auto-detect available auth methods
-  persistSession: true,
-};
+export const AGENTS: ACPAgentConfig[] = [
+  {
+    name: "Claude Code",
+    command: "npx",
+    args: ["-y", "@zed-industries/claude-code-acp"],
+    persistSession: true,
+    npmPackage: "@zed-industries/claude-code-acp",
+    env: [{ key: "ANTHROPIC_API_KEY", required: false }],
+    installHint: "npm install -g @zed-industries/claude-code-acp",
+  },
+  {
+    name: "Codex CLI",
+    command: "npx",
+    args: ["-y", "@zed-industries/codex-acp"],
+    persistSession: true,
+    npmPackage: "@zed-industries/codex-acp",
+    env: [{ key: "OPENAI_API_KEY", required: false }],
+    installHint: "npm install -g @zed-industries/codex-acp",
+  },
+  {
+    name: "GitHub Copilot",
+    command: "copilot",
+    args: ["--acp"],
+    persistSession: true,
+    installHint: "npm install -g @github/copilot",
+  },
+  {
+    name: "Gemini CLI",
+    command: "gemini",
+    args: ["--experimental-acp"],
+    authMethodId: "gemini-api-key",
+    persistSession: true,
+    env: [{ key: "GEMINI_API_KEY", required: false }],
+    installHint: "npm install -g @google-gemini/gemini-cli",
+  },
+  {
+    name: "Kimi CLI",
+    command: "kimi",
+    args: ["--acp"],
+    persistSession: true,
+    installHint: "pip install kimi-cli",
+  },
+  {
+    name: "Goose",
+    command: "goose",
+    args: ["acp"],
+    persistSession: true,
+    installHint: "pipx install goose-ai",
+  },
+  {
+    name: "OpenCode",
+    command: "opencode",
+    args: ["acp"],
+    persistSession: true,
+    installHint: "npm install -g opencode-ai",
+  },
+  {
+    name: "Cursor Agent",
+    command: "cursor",
+    args: ["agent", "acp"],
+    persistSession: true,
+    installHint: "Cursor editor bundles the cursor CLI",
+  },
+  {
+    name: "Droid",
+    command: "droid",
+    args: ["exec", "--output-format", "acp"],
+    persistSession: true,
+    env: [{ key: "FACTORY_API_KEY", required: false }],
+    installHint: "npm install -g @factory-ai/droid",
+  },
+  {
+    name: "CodeBuddy Code",
+    command: "npx",
+    args: ["-y", "@tencent-ai/codebuddy-code", "--acp"],
+    persistSession: true,
+    npmPackage: "@tencent-ai/codebuddy-code",
+    env: [{ key: "CODEBUDDY_API_KEY", required: false }],
+    installHint: "npm install -g @tencent-ai/codebuddy-code",
+  },
+];
+
+const AGENT_MAP = new Map(AGENTS.map((a) => [a.name.toLowerCase(), a]));
+
+export function resolveAgent(name?: string): ACPAgentConfig {
+  const key = (name ?? process.env.ACP_AGENT ?? "opencode").toLowerCase();
+  const agent = AGENT_MAP.get(key);
+  if (agent) return agent;
+  const match = AGENTS.find((a) => a.name.toLowerCase().includes(key));
+  if (match) return match;
+  console.warn(`[agents] Unknown agent "${name ?? process.env.ACP_AGENT}", falling back to OpenCode`);
+  return AGENTS[6]; // OpenCode
+}
+
+export const defaultAgent = resolveAgent();

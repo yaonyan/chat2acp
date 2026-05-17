@@ -37,7 +37,7 @@ OpenCode / CodeBuddy / Claude  ←  the actual AI agent (ACP subprocess)
 | `src/watchdog.ts` | **Parent process** — spawns bot, watches `src/` for changes, hot reloads, auto-restarts on crash. This is what `pnpm dev` runs. |
 | `src/index.ts` | **Bot process** — reads `CHAT_ADAPTER` env var, creates bot, starts listening, prints `CHAT2ACP_READY` to signal watchdog. |
 | `src/bot.ts` | **Bot factory** — `createBot()` builds the ACP provider, chat adapter, and mention handler. Exports `CHAT_ADAPTERS` registry and `CreateBotOptions`. |
-| `src/agents.config.ts` | **Agent config** — defines `ACPAgentConfig` interface and `defaultAgent` (OpenCode with `opencode acp` args). |
+| `src/agents.config.ts` | **Agent config** — defines `ACPAgentConfig` interface and `AGENTS` registry of 10 ACP-compatible agents. `resolveAgent()` picks via `ACP_AGENT` env var, defaults to OpenCode. |
 | `src/__tests__/bot.e2e.test.ts` | **Integration tests** — mocks `ai` + `@mcpc-tech/acp-ai-provider`, tests mention handler via `chat.handleIncomingMessage()`. |
 | `src/test-utils.ts` | **Test helpers** — `createMockAdapter`, `createMockState`, `createTestMessage`. |
 
@@ -76,20 +76,28 @@ Key behaviors:
 - **Rollback**: new code fails → old bot stays running, zero downtime
 - **Auto-recover**: bot crashes → 2s → restarted automatically
 
-## ACP agent — default config
+## ACP agent — how to switch
 
-Default agent is **OpenCode** (`opencode acp`). Configured in `src/agents.config.ts`:
+Set `ACP_AGENT` in `.env` to pick a different agent:
 
-```ts
-export const defaultAgent: ACPAgentConfig = {
-  command: "opencode",
-  args: ["acp"],
-  persistSession: true,
-  // authMethodId omitted — auto-detect from agent
-};
-```
+| `ACP_AGENT` | Agent | Command | Env |
+|-------------|-------|---------|-----|
+| `opencode` (default) | OpenCode | `opencode acp` | — |
+| `claude` | Claude Code | `npx -y @zed-industries/claude-code-acp` | `ANTHROPIC_API_KEY` |
+| `codex` | Codex CLI | `npx -y @zed-industries/codex-acp` | `OPENAI_API_KEY` |
+| `copilot` | GitHub Copilot | `copilot --acp` | — |
+| `gemini` | Gemini CLI | `gemini --experimental-acp` | `GEMINI_API_KEY` |
+| `kimi` | Kimi CLI | `kimi --acp` | — |
+| `goose` | Goose | `goose acp` | — |
+| `cursor` | Cursor Agent | `cursor agent acp` | — |
+| `droid` | Droid | `droid exec --output-format acp` | `FACTORY_API_KEY` |
+| `codebuddy` | CodeBuddy Code | `npx -y @tencent-ai/codebuddy-code --acp` | `CODEBUDDY_API_KEY` |
 
-On Windows, `resolveCommand()` translates `opencode` → `opencode-ai/bin/opencode.exe` to avoid `.cmd` wrapper spawn issues.
+All agents use `persistSession: true` — the ACP provider keeps the process alive between calls.
+
+On Windows, `opencode` resolves to `opencode-ai/bin/opencode.exe` directly to avoid `.cmd` wrapper stdio issues. All other agents pass through — Windows handles PATH resolution for `.cmd`/`.exe` files.
+
+Config source: `src/agents.config.ts` — `AGENTS` array + `resolveAgent()` function. You can extend it with custom agents.
 
 ## Dev workflow
 

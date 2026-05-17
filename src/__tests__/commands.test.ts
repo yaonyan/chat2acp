@@ -293,7 +293,7 @@ describe("registerCommands onNewMessage fallback", () => {
     await msgHandlers[0](thread, message);
 
     expect(thread.post).toHaveBeenCalledWith(
-      expect.stringContaining("Available commands"),
+      expect.objectContaining({ markdown: expect.stringContaining("Available commands") }),
     );
   });
 
