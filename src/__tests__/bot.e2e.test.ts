@@ -20,6 +20,9 @@ import {
 } from "../test-utils.js";
 import type { Adapter } from "chat";
 
+// ─── spy on Chat.prototype.onSlashCommand ────────────────────────────────────
+const onSlashCommandSpy = vi.spyOn(Chat.prototype, "onSlashCommand");
+
 // ─── mock "ai" ────────────────────────────────────────────────────────────────
 vi.mock("ai", () => ({
   generateText: vi.fn(),
@@ -303,6 +306,47 @@ describe("mention handler 核心逻辑（单元）", () => {
     expect(generateTextMock).toHaveBeenCalledWith(
       expect.objectContaining({ tools: undefined })
     );
+  });
+});
+
+// ─── Slash command integration tests ──────────────────────────────────────
+
+describe("createBot — slash command registration", () => {
+  it("registers onSlashCommand handler during createBot", async () => {
+    onSlashCommandSpy.mockClear();
+
+    const mockAdapter = createMockAdapter("discord");
+    const mockState = createMockState();
+
+    createBot({
+      adapter: "discord",
+      provider: mockProvider as any,
+      chatAdapter: mockAdapter,
+      state: mockState,
+      adminUserIds: ["admin-1"],
+    });
+
+    expect(onSlashCommandSpy).toHaveBeenCalled();
+  });
+
+  it("slash command handler is registered as catch-all (no filter)", async () => {
+    onSlashCommandSpy.mockClear();
+
+    const mockAdapter = createMockAdapter("discord");
+    const mockState = createMockState();
+
+    createBot({
+      adapter: "discord",
+      provider: mockProvider as any,
+      chatAdapter: mockAdapter,
+      state: mockState,
+    });
+
+    // catch-all registration: first arg is a function, no second arg
+    const call = onSlashCommandSpy.mock.calls[0];
+    expect(call).toBeDefined();
+    expect(call[0]).toBeInstanceOf(Function);
+    expect(call[1]).toBeUndefined();
   });
 });
 

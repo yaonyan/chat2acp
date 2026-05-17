@@ -9,6 +9,7 @@ import { createMemoryState } from "@chat-adapter/state-memory";
 import type { StateAdapter } from "chat";
 import type { Adapter } from "chat";
 import { defaultAgent, type ACPAgentConfig } from "./agents.config.js";
+import { registerCommands } from "./commands.js";
 
 // ── Chat adapter registry ──────────────────────────────────────────────────
 
@@ -57,11 +58,20 @@ export interface CreateBotOptions {
   args?: string[];
   /** Discord only: allowed guild channels */
   allowedChannels?: string[];
+  /** User IDs allowed to run admin slash commands */
+  adminUserIds?: string[];
 }
 
 function resolveAllowedChannels(opt?: string[]): Set<string> {
   const fromEnv = process.env.DISCORD_ALLOWED_CHANNELS
     ? process.env.DISCORD_ALLOWED_CHANNELS.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+  return new Set([...(opt ?? []), ...fromEnv]);
+}
+
+function resolveAdminUserIds(opt?: string[]): Set<string> {
+  const fromEnv = process.env.ADMIN_USER_IDS
+    ? process.env.ADMIN_USER_IDS.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
   return new Set([...(opt ?? []), ...fromEnv]);
 }
@@ -118,6 +128,16 @@ export function createBot(opts: CreateBotOptions = {}) {
     }
 
     const userText = message.text ?? "";
+
+    // Check if this mention is actually a slash command (e.g. DMs on Telegram
+    // where all messages are auto-promoted to mentions, bypassing onNewMessage)
+    const commandResponse = await tryDispatchText(userText, message.author?.userId);
+    if (commandResponse !== null) {
+      console.log(`[${adapterName}] Command via mention: "${userText}" → dispatched`);
+      await thread.post(commandResponse);
+      return;
+    }
+
     console.log(`[${adapterName}] Received: ${userText}`);
 
     try {
@@ -132,6 +152,10 @@ export function createBot(opts: CreateBotOptions = {}) {
       await thread.post("Something went wrong. Please try again.");
     }
   });
+
+  // ── Admin slash commands ────────────────────────────────────────────────
+  const adminUserIds = resolveAdminUserIds(opts.adminUserIds);
+  const { tryDispatchText } = registerCommands({ bot, adminUserIds, provider, adapterName, agentCommand: command, agentArgs: args });
 
   // ── startListening ──────────────────────────────────────────────────────
   async function startListening(signal?: AbortSignal) {

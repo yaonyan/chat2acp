@@ -5,3 +5,4 @@ dist/
 .weixin-state.json
 nul
 .chat2acp.pid
+.chat2acp.session
