@@ -62,7 +62,7 @@ describe("registerCommands dispatch", () => {
     await slashHandlers[0](event);
 
     expect(event.channel.post).toHaveBeenCalledWith(
-      expect.stringContaining("**Available commands:**"),
+      expect.stringContaining("Available commands:"),
     );
     expect(event.channel.post).toHaveBeenCalledWith(
       expect.stringContaining("/help"),

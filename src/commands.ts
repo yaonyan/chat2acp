@@ -24,10 +24,10 @@ const helpCmd: Command = {
   description: "Show available commands",
   adminOnly: false,
   async execute() {
-    const lines = ["**Available commands:**"];
+    const lines = ["Available commands:"];
     for (const cmd of builtinCommands) {
-      const adminTag = cmd.adminOnly ? " *(admin)*" : "";
-      lines.push(`- \`/${cmd.name}\` — ${cmd.description}${adminTag}`);
+      const adminTag = cmd.adminOnly ? " (admin)" : "";
+      lines.push(`- /${cmd.name} — ${cmd.description}${adminTag}`);
     }
     return lines.join("\n");
   },
@@ -62,10 +62,10 @@ const statusCmd: Command = {
     const sessionId = ctx.provider.getSessionId();
     const agent = `${ctx.agentCommand} ${ctx.agentArgs.join(" ")}`.trim();
     return [
-      `**Agent Status**`,
-      `- Agent: \`${agent}\``,
-      `- Adapter: \`${ctx.adapterName}\``,
-      `- Session: ${sessionId ? `\`${sessionId}\`` : "none"}`,
+      `== Agent Status ==`,
+      `Agent: ${agent}`,
+      `Adapter: ${ctx.adapterName}`,
+      `Session: ${sessionId ?? "none"}`,
     ].join("\n");
   },
 };
