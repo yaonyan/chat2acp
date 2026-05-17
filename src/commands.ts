@@ -10,11 +10,13 @@ export interface CommandContext {
   agentArgs: string[];
 }
 
+export type CommandResult = string | { markdown: string };
+
 export interface Command {
   name: string;
   description: string;
   adminOnly: boolean;
-  execute(ctx: CommandContext): Promise<string>;
+  execute(ctx: CommandContext): Promise<CommandResult>;
 }
 
 // ── Built-in commands ──────────────────────────────────────────────────────
@@ -24,12 +26,12 @@ const helpCmd: Command = {
   description: "Show available commands",
   adminOnly: false,
   async execute() {
-    const lines = ["Available commands:"];
+    const lines = ["**Available commands:**"];
     for (const cmd of builtinCommands) {
-      const adminTag = cmd.adminOnly ? " (admin)" : "";
-      lines.push(`- /${cmd.name} — ${cmd.description}${adminTag}`);
+      const adminTag = cmd.adminOnly ? " *(admin)*" : "";
+      lines.push(`- \`/${cmd.name}\` — ${cmd.description}${adminTag}`);
     }
-    return lines.join("\n");
+    return { markdown: lines.join("\n") };
   },
 };
 
@@ -61,12 +63,14 @@ const statusCmd: Command = {
   async execute(ctx) {
     const sessionId = ctx.provider.getSessionId();
     const agent = `${ctx.agentCommand} ${ctx.agentArgs.join(" ")}`.trim();
-    return [
-      `== Agent Status ==`,
-      `Agent: ${agent}`,
-      `Adapter: ${ctx.adapterName}`,
-      `Session: ${sessionId ?? "none"}`,
-    ].join("\n");
+    return {
+      markdown: [
+        `**Agent Status**`,
+        `- Agent: \`${agent}\``,
+        `- Adapter: \`${ctx.adapterName}\``,
+        `- Session: ${sessionId ? `\`${sessionId}\`` : "none"}`,
+      ].join("\n"),
+    };
   },
 };
 

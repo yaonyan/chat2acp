@@ -62,19 +62,19 @@ describe("registerCommands dispatch", () => {
     await slashHandlers[0](event);
 
     expect(event.channel.post).toHaveBeenCalledWith(
-      expect.stringContaining("Available commands:"),
+      expect.objectContaining({ markdown: expect.stringContaining("**Available commands:**") }),
     );
     expect(event.channel.post).toHaveBeenCalledWith(
-      expect.stringContaining("/help"),
+      expect.objectContaining({ markdown: expect.stringContaining("/help") }),
     );
     expect(event.channel.post).toHaveBeenCalledWith(
-      expect.stringContaining("/clear"),
+      expect.objectContaining({ markdown: expect.stringContaining("/clear") }),
     );
     expect(event.channel.post).toHaveBeenCalledWith(
-      expect.stringContaining("/restart"),
+      expect.objectContaining({ markdown: expect.stringContaining("/restart") }),
     );
     expect(event.channel.post).toHaveBeenCalledWith(
-      expect.stringContaining("/status"),
+      expect.objectContaining({ markdown: expect.stringContaining("/status") }),
     );
   });
 
@@ -151,10 +151,10 @@ describe("registerCommands dispatch", () => {
     await slashHandlers[0](event);
 
     expect(event.channel.post).toHaveBeenCalledWith(
-      expect.stringContaining("session-abc"),
+      expect.objectContaining({ markdown: expect.stringContaining("session-abc") }),
     );
     expect(event.channel.post).toHaveBeenCalledWith(
-      expect.stringContaining("discord"),
+      expect.objectContaining({ markdown: expect.stringContaining("discord") }),
     );
   });
 
@@ -255,7 +255,7 @@ describe("registerCommands dispatch", () => {
     await slashHandlers[0](event);
 
     expect(event.channel.post).toHaveBeenCalledWith(
-      expect.stringContaining("Available commands"),
+      expect.objectContaining({ markdown: expect.stringContaining("Available commands") }),
     );
   });
 });
