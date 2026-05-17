@@ -1,0 +1,33 @@
+{
+  "name": "chat2acp",
+  "version": "0.1.0",
+  "description": "Bridge any chat platform to any ACP-compatible AI agent",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.6"
+  },
+  "dependencies": {
+    "@chat-adapter/discord": "latest",
+    "@chat-adapter/state-memory": "^4.28.1",
+    "@yaonyan/chat-adapter-weixin": "file:../chat-adapter-weixin",
+    "@mcpc-tech/acp-ai-provider": "latest",
+    "ai": "^6.0.182",
+    "chat": "latest"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
