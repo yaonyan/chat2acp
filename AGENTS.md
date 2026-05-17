@@ -85,19 +85,20 @@ Set `ACP_AGENT` in `.env` to pick a different agent:
 | `opencode` (default) | OpenCode | `opencode acp` | — |
 | `claude` | Claude Code | `npx -y @zed-industries/claude-code-acp` | `ANTHROPIC_API_KEY` |
 | `codex` | Codex CLI | `npx -y @zed-industries/codex-acp` | `OPENAI_API_KEY` |
-| `copilot` | GitHub Copilot | `copilot --acp` | — |
-| `gemini` | Gemini CLI | `gemini --experimental-acp` | `GEMINI_API_KEY` |
+| `copilot` | GitHub Copilot | `npx -y @github/copilot --acp` | — |
+| `gemini` | Gemini CLI | `npx -y @google/gemini-cli --acp` | `GEMINI_API_KEY` |
 | `kimi` | Kimi CLI | `kimi --acp` | — |
 | `goose` | Goose | `goose acp` | — |
 | `cursor` | Cursor Agent | `cursor agent acp` | — |
-| `droid` | Droid | `droid exec --output-format acp` | `FACTORY_API_KEY` |
+| `droid` | Factory Droid | `npx -y droid exec --output-format acp-daemon` | `FACTORY_API_KEY` |
 | `codebuddy` | CodeBuddy Code | `npx -y @tencent-ai/codebuddy-code --acp` | `CODEBUDDY_API_KEY` |
 
 All agents use `persistSession: true` — the ACP provider keeps the process alive between calls.
 
-On Windows, `opencode` resolves to `opencode-ai/bin/opencode.exe` directly to avoid `.cmd` wrapper stdio issues. All other agents pass through — Windows handles PATH resolution for `.cmd`/`.exe` files.
+IDs match the [ACP Registry](https://agentclientprotocol.com/get-started/registry) convention.
+Config source: `src/agents.config.ts` — `AGENTS` array + `resolveAgent()` function.
 
-Config source: `src/agents.config.ts` — `AGENTS` array + `resolveAgent()` function. You can extend it with custom agents.
+On Windows, `opencode` resolves to `opencode-ai/bin/opencode.exe` directly to avoid `.cmd` wrapper stdio issues. All other agents pass through — Windows handles PATH resolution for `.cmd`/`.exe` files.
 
 ## Dev workflow
 
