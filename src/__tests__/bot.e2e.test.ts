@@ -78,8 +78,9 @@ describe("createBot e2e — 完整 mention 链路（channel 白名单已配置�
 
     // 传入白名单，允许测试用的 guild channel
     const result = createBot({
+      adapter: "discord",
       provider: mockProvider as any,
-      discordAdapter: mockAdapter,
+      chatAdapter: mockAdapter,
       state: mockState,
       allowedChannels: [`${GUILD_ID}:${CHANNEL_ID}`],
     });
@@ -126,7 +127,7 @@ describe("createBot e2e — 完整 mention 链路（channel 白名单已配置�
 
     expect(mockAdapter.postMessage).toHaveBeenCalledWith(
       THREAD_ID,
-      "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+      "Something went wrong. Please try again."
     );
   });
 
@@ -203,8 +204,9 @@ describe("createBot e2e — Channel 访问控制", () => {
     const mockState = createMockState();
 
     const result = createBot({
+      adapter: "discord",
       provider: mockProvider as any,
-      discordAdapter: mockAdapter,
+      chatAdapter: mockAdapter,
       state: mockState,
       allowedChannels,
     });
@@ -289,7 +291,7 @@ describe("mention handler 核心逻辑（单元）", () => {
 
     const { posts } = await invokeHandler(generateTextMock, "会超时的问题");
 
-    expect(posts).toEqual(["오류가 발생했습니다. 잠시 후 다시 시도해주세요."]);
+    expect(posts).toEqual(["Something went wrong. Please try again."]);
   });
 
   it("tools 为 undefined 时也能正常调用", async () => {
@@ -307,7 +309,7 @@ describe("mention handler 核心逻辑（单元）", () => {
 // ─── helper：直接执行 handler 逻辑，返回 posts ────────────────────────────────
 
 async function invokeHandler(
-  generateTextFn: ReturnType<typeof vi.fn>,
+  generateTextFn: (...args: any[]) => Promise<{ text: string }>,
   text: string
 ): Promise<{ posts: string[] }> {
   const posts: string[] = [];
@@ -326,7 +328,7 @@ async function invokeHandler(
     });
     await thread.post(result.text);
   } catch {
-    await thread.post("오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+    await thread.post("Something went wrong. Please try again.");
   }
 
   return { posts };

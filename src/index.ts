@@ -1,7 +1,7 @@
 import "dotenv/config";
-import { createBot } from "./bot.js";
+import { createBot, type ChatAdapterName } from "./bot.js";
 
-const adapter = process.env.CHAT_ADAPTER ?? "weixin";
+const adapter = (process.env.CHAT_ADAPTER ?? "weixin") as ChatAdapterName;
 const { bot, provider, startListening } = createBot({ adapter });
 
 await bot.initialize();
