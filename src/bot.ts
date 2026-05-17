@@ -152,11 +152,7 @@ export function createBot(opts: CreateBotOptions = {}) {
         prompt: userText,
         tools: provider.tools as any,
       });
-      let text = "";
-      for await (const chunk of textStream) {
-        text += chunk;
-      }
-      await thread.post({ markdown: text });
+      await thread.post(textStream);
     } catch (err) {
       console.error("[ACP] Error:", err);
       await thread.post("Something went wrong. Please try again.");
