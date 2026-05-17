@@ -18,8 +18,8 @@ importers:
         specifier: latest
         version: 0.3.3
       '@yaonyan/chat-adapter-weixin':
-        specifier: file:../chat-adapter-weixin
-        version: file:../chat-adapter-weixin(chat@4.28.1)
+        specifier: ^0.0.1
+        version: 0.0.1(chat@4.28.1)
       ai:
         specifier: ^6.0.182
         version: 6.0.182(zod@3.25.76)
@@ -797,8 +797,8 @@ packages:
   '@workflow/serde@4.1.0-beta.2':
     resolution: {integrity: sha512-8kkeoQKLDaKXefjV5dbhBj2aErfKp1Mc4pb6tj8144cF+Em5SPbyMbyLCHp+BVrFfFVCBluCtMx+jjvaFVZGww==}
 
-  '@yaonyan/chat-adapter-weixin@file:../chat-adapter-weixin':
-    resolution: {directory: ../chat-adapter-weixin, type: directory}
+  '@yaonyan/chat-adapter-weixin@0.0.1':
+    resolution: {integrity: sha512-pjd3VW7J6vSxq0v1/uEVbcBRQTrDG+070790d3BDIHmI6O8R84xqZLTWGq5AfH6grcGnNJax13/oAEP6/7fynA==}
     peerDependencies:
       chat: '>=4.0.0'
 
@@ -2387,7 +2387,7 @@ snapshots:
 
   '@workflow/serde@4.1.0-beta.2': {}
 
-  '@yaonyan/chat-adapter-weixin@file:../chat-adapter-weixin(chat@4.28.1)':
+  '@yaonyan/chat-adapter-weixin@0.0.1(chat@4.28.1)':
     dependencies:
       chat: 4.28.1
 

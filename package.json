@@ -22,7 +22,7 @@
     "@chat-adapter/discord": "latest",
     "@chat-adapter/state-memory": "^4.28.1",
     "@mcpc-tech/acp-ai-provider": "latest",
-    "@yaonyan/chat-adapter-weixin": "file:../chat-adapter-weixin",
+    "@yaonyan/chat-adapter-weixin": "^0.0.1",
     "ai": "^6.0.182",
     "chat": "latest",
     "dotenv": "^17.4.2"
