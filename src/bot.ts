@@ -1,5 +1,5 @@
 import { createACPProvider, type ACPProvider } from "@mcpc-tech/acp-ai-provider";
-import { generateText } from "ai";
+import { streamText } from "ai";
 import { Chat } from "chat";
 import { createDiscordAdapter, type DiscordAdapter } from "@chat-adapter/discord";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
@@ -147,12 +147,16 @@ export function createBot(opts: CreateBotOptions = {}) {
     console.log(`[${adapterName}] Received: ${userText}`);
 
     try {
-      const result = await generateText({
+      const { textStream } = streamText({
         model: provider.languageModel() as any,
         prompt: userText,
         tools: provider.tools as any,
       });
-      await thread.post(result.text);
+      let text = "";
+      for await (const chunk of textStream) {
+        text += chunk;
+      }
+      await thread.post({ markdown: text });
     } catch (err) {
       console.error("[ACP] Error:", err);
       await thread.post("Something went wrong. Please try again.");

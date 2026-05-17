@@ -25,7 +25,7 @@ const onSlashCommandSpy = vi.spyOn(Chat.prototype, "onSlashCommand");
 
 // ─── mock "ai" ────────────────────────────────────────────────────────────────
 vi.mock("ai", () => ({
-  generateText: vi.fn(),
+  streamText: vi.fn(),
 }));
 
 // ─── mock "@mcpc-tech/acp-ai-provider" ────────────────────────────────────────
@@ -52,7 +52,7 @@ vi.mock("@mcpc-tech/acp-ai-provider", () => ({
   createACPProvider: vi.fn(() => mockProvider),
 }));
 
-import { generateText } from "ai";
+import { streamText } from "ai";
 import { createBot } from "../bot.js";
 
 // ─── 常量 ──────────────────────────────────────────────────────────────────────
@@ -94,10 +94,8 @@ describe("createBot e2e — 完整 mention 链路（channel 白名单已配置�
     );
   });
 
-  it("mention → generateText 以正确 prompt 调用 → thread.post 回复 AI 文本", async () => {
-    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
-      text: "Hello from codebuddy!",
-    });
+  it("mention → streamText 以正确 prompt 调用 → thread.post 回复 AI 文本", async () => {
+    (streamText as ReturnType<typeof vi.fn>).mockReturnValue(mockStreamText("Hello from codebuddy!"));
 
     const message = createTestMessage("msg-1", "帮我写一段 TypeScript 函数", {
       isMention: true,
@@ -105,7 +103,7 @@ describe("createBot e2e — 完整 mention 链路（channel 白名单已配置�
 
     await chat.handleIncomingMessage(mockAdapter, THREAD_ID, message);
 
-    expect(generateText).toHaveBeenCalledWith(
+    expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({
         prompt: "帮我写一段 TypeScript 函数",
       })
@@ -113,12 +111,12 @@ describe("createBot e2e — 完整 mention 链路（channel 白名单已配置�
     expect(mockProvider.languageModel).toHaveBeenCalled();
     expect(mockAdapter.postMessage).toHaveBeenCalledWith(
       THREAD_ID,
-      "Hello from codebuddy!"
+      { markdown: "Hello from codebuddy!" }
     );
   });
 
-  it("generateText 抛出错误 → thread.post 错误提示", async () => {
-    (generateText as ReturnType<typeof vi.fn>).mockRejectedValue(
+  it("streamText 抛出错误 → thread.post 错误提示", async () => {
+    (streamText as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("ACP process exited unexpectedly")
     );
 
@@ -134,41 +132,37 @@ describe("createBot e2e — 完整 mention 链路（channel 白名单已配置�
     );
   });
 
-  it("消息文本为空 → generateText 以空字符串 prompt 调用", async () => {
-    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
-      text: "空输入也能处理",
-    });
+  it("消息文本为空 → streamText 以空字符串 prompt 调用", async () => {
+    (streamText as ReturnType<typeof vi.fn>).mockReturnValue(mockStreamText("空输入也能处理"));
 
     const message = createTestMessage("msg-3", "", { isMention: true });
 
     await chat.handleIncomingMessage(mockAdapter, THREAD_ID, message);
 
-    expect(generateText).toHaveBeenCalledWith(
+    expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: "" })
     );
   });
 
-  it("provider.tools 正确传入 generateText", async () => {
+  it("provider.tools 正确传入 streamText", async () => {
     const mockTools = { codeTool: { description: "run code" } };
     mockProvider.tools = mockTools as any;
 
-    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({
-      text: "工具调用结果",
-    });
+    (streamText as ReturnType<typeof vi.fn>).mockReturnValue(mockStreamText("工具调用结果"));
 
     const message = createTestMessage("msg-4", "用工具执行", { isMention: true });
 
     await chat.handleIncomingMessage(mockAdapter, THREAD_ID, message);
 
-    expect(generateText).toHaveBeenCalledWith(
+    expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({ tools: mockTools })
     );
   });
 
-  it("多次连续 mention → 每次各自调用 generateText", async () => {
-    (generateText as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({ text: "第一次回复" })
-      .mockResolvedValueOnce({ text: "第二次回复" });
+  it("多次连续 mention → 每次各自调用 streamText", async () => {
+    (streamText as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(mockStreamText("第一次回复"))
+      .mockReturnValueOnce(mockStreamText("第二次回复"));
 
     await chat.handleIncomingMessage(
       mockAdapter,
@@ -181,18 +175,18 @@ describe("createBot e2e — 完整 mention 链路（channel 白名单已配置�
       createTestMessage("msg-5b", "第二条消息", { isMention: true })
     );
 
-    expect(generateText).toHaveBeenCalledTimes(2);
+    expect(streamText).toHaveBeenCalledTimes(2);
     expect(mockAdapter.postMessage).toHaveBeenCalledTimes(2);
   });
 
-  it("非 mention 消息 → 不触发 generateText", async () => {
+  it("非 mention 消息 → 不触发 streamText", async () => {
     const message = createTestMessage("msg-6", "普通消息，没有 @bot", {
       isMention: false,
     });
 
     await chat.handleIncomingMessage(mockAdapter, THREAD_ID, message);
 
-    expect(generateText).not.toHaveBeenCalled();
+    expect(streamText).not.toHaveBeenCalled();
   });
 });
 
@@ -221,7 +215,7 @@ describe("createBot e2e — Channel 访问控制", () => {
   }
 
   it("未配置白名单 → guild channel mention 全部放行", async () => {
-    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({ text: "x" });
+    (streamText as ReturnType<typeof vi.fn>).mockReturnValue(mockStreamText("x"));
     const { chat, mockAdapter } = await buildBot([]);
 
     await chat.handleIncomingMessage(
@@ -230,11 +224,11 @@ describe("createBot e2e — Channel 访问控制", () => {
       createTestMessage("msg-block", "hello", { isMention: true })
     );
 
-    expect(generateText).toHaveBeenCalledTimes(1);
+    expect(streamText).toHaveBeenCalledTimes(1);
   });
 
   it("白名单包含该 channel → guild channel mention 正常响应", async () => {
-    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({ text: "hi" });
+    (streamText as ReturnType<typeof vi.fn>).mockReturnValue(mockStreamText("hi"));
     const { chat, mockAdapter } = await buildBot([`${GUILD_ID}:${CHANNEL_ID}`]);
 
     await chat.handleIncomingMessage(
@@ -243,11 +237,11 @@ describe("createBot e2e — Channel 访问控制", () => {
       createTestMessage("msg-allow", "hello", { isMention: true })
     );
 
-    expect(generateText).toHaveBeenCalledTimes(1);
+    expect(streamText).toHaveBeenCalledTimes(1);
   });
 
   it("DM 不需要白名单 → 默认允许", async () => {
-    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({ text: "hi" });
+    (streamText as ReturnType<typeof vi.fn>).mockReturnValue(mockStreamText("hi"));
     // 不传 allowedChannels，只允许 DM
     const { chat, mockAdapter } = await buildBot([]);
 
@@ -257,11 +251,11 @@ describe("createBot e2e — Channel 访问控制", () => {
       createTestMessage("msg-dm", "private question", { isMention: true, threadId: DM_THREAD_ID })
     );
 
-    expect(generateText).toHaveBeenCalledTimes(1);
+    expect(streamText).toHaveBeenCalledTimes(1);
   });
 
   it("白名单只含 guild A → guild B 的 mention 被忽略", async () => {
-    (generateText as ReturnType<typeof vi.fn>).mockResolvedValue({ text: "x" });
+    (streamText as ReturnType<typeof vi.fn>).mockReturnValue(mockStreamText("x"));
     const { chat, mockAdapter } = await buildBot(["OTHER_GUILD:OTHER_CHANNEL"]);
 
     await chat.handleIncomingMessage(
@@ -270,7 +264,7 @@ describe("createBot e2e — Channel 访问控制", () => {
       createTestMessage("msg-wrong-guild", "hello", { isMention: true })
     );
 
-    expect(generateText).not.toHaveBeenCalled();
+    expect(streamText).not.toHaveBeenCalled();
   });
 });
 
@@ -278,32 +272,32 @@ describe("createBot e2e — Channel 访问控制", () => {
 
 describe("mention handler 核心逻辑（单元）", () => {
   it("成功：调用 languageModel() 并传递 prompt", async () => {
-    const generateTextMock = vi.fn().mockResolvedValue({ text: "回复内容" });
+    const streamTextMock = vi.fn().mockReturnValue(mockStreamText("回复内容"));
 
-    const { posts } = await invokeHandler(generateTextMock, "请解释这段代码");
+    const { posts } = await invokeHandler(streamTextMock, "请解释这段代码");
 
     expect(mockProvider.languageModel).toHaveBeenCalled();
-    expect(generateTextMock).toHaveBeenCalledWith(
+    expect(streamTextMock).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: "请解释这段代码" })
     );
     expect(posts).toEqual(["回复内容"]);
   });
 
-  it("失败：generateText 抛错时 post 错误提示", async () => {
-    const generateTextMock = vi.fn().mockRejectedValue(new Error("timeout"));
+  it("失败：streamText 抛错时 post 错误提示", async () => {
+    const streamTextMock = vi.fn().mockRejectedValue(new Error("timeout"));
 
-    const { posts } = await invokeHandler(generateTextMock, "会超时的问题");
+    const { posts } = await invokeHandler(streamTextMock, "会超时的问题");
 
     expect(posts).toEqual(["Something went wrong. Please try again."]);
   });
 
   it("tools 为 undefined 时也能正常调用", async () => {
-    const generateTextMock = vi.fn().mockResolvedValue({ text: "ok" });
+    const streamTextMock = vi.fn().mockReturnValue(mockStreamText("ok"));
     mockProvider.tools = undefined;
 
-    await invokeHandler(generateTextMock, "无 tools 的问题");
+    await invokeHandler(streamTextMock, "无 tools 的问题");
 
-    expect(generateTextMock).toHaveBeenCalledWith(
+    expect(streamTextMock).toHaveBeenCalledWith(
       expect.objectContaining({ tools: undefined })
     );
   });
@@ -350,27 +344,40 @@ describe("createBot — slash command registration", () => {
   });
 });
 
+// ─── helper：构造 streamText 的 mock 返回值 ───────────────────────────────
+function mockStreamText(text: string) {
+  return {
+    textStream: (async function* () {
+      yield text;
+    })(),
+  };
+}
+
 // ─── helper：直接执行 handler 逻辑，返回 posts ────────────────────────────────
 
 async function invokeHandler(
-  generateTextFn: (...args: any[]) => Promise<{ text: string }>,
+  streamTextFn: (...args: any[]) => ReturnType<typeof mockStreamText>,
   text: string
 ): Promise<{ posts: string[] }> {
   const posts: string[] = [];
   const thread = {
-    post: vi.fn(async (msg: string) => {
-      posts.push(msg);
+    post: vi.fn(async (msg: string | object) => {
+      posts.push(typeof msg === "string" ? msg : (msg as any).markdown);
       return {} as any;
     }),
   } as any;
 
   try {
-    const result = await generateTextFn({
+    const { textStream } = streamTextFn({
       model: mockProvider.languageModel() as any,
       prompt: text,
       tools: mockProvider.tools as any,
     });
-    await thread.post(result.text);
+    let result = "";
+    for await (const chunk of textStream) {
+      result += chunk;
+    }
+    await thread.post({ markdown: result });
   } catch {
     await thread.post("Something went wrong. Please try again.");
   }
