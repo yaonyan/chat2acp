@@ -114,6 +114,7 @@ export function createBot(opts: CreateBotOptions = {}) {
     userName: "chat2acp-bot",
     adapters: { [adapterName]: chatAdapter },
     state: opts.state ?? createMemoryState(),
+    fallbackStreamingPlaceholderText: null,
   });
 
   // ── Generic mention handler ─────────────────────────────────────────────
@@ -147,6 +148,7 @@ export function createBot(opts: CreateBotOptions = {}) {
     console.log(`[${adapterName}] Received: ${userText}`);
 
     try {
+      thread.startTyping();
       const { textStream } = streamText({
         model: provider.languageModel() as any,
         prompt: userText,
