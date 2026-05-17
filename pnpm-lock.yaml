@@ -14,18 +14,21 @@ importers:
       '@chat-adapter/state-memory':
         specifier: ^4.28.1
         version: 4.28.1
-      '@chat-adapter/weixin':
-        specifier: file:../chat-adapter-weixin
-        version: file:../chat-adapter-weixin(chat@4.28.1)
       '@mcpc-tech/acp-ai-provider':
         specifier: latest
         version: 0.3.3
+      '@yaonyan/chat-adapter-weixin':
+        specifier: file:../chat-adapter-weixin
+        version: file:../chat-adapter-weixin(chat@4.28.1)
       ai:
         specifier: ^6.0.182
         version: 6.0.182(zod@3.25.76)
       chat:
         specifier: latest
         version: 4.28.1
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
     devDependencies:
       '@types/node':
         specifier: ^25.8.0
@@ -71,11 +74,6 @@ packages:
 
   '@chat-adapter/state-memory@4.28.1':
     resolution: {integrity: sha512-KMKrPPU9inr+GVH5pIL81aSW0+LXulxZMktSzf5JOgE6C8WHmUAcGN9B0C80edyeC5qeXOyl0Vl3ZecPZsWDqQ==}
-
-  '@chat-adapter/weixin@file:../chat-adapter-weixin':
-    resolution: {directory: ../chat-adapter-weixin, type: directory}
-    peerDependencies:
-      chat: '>=4.0.0'
 
   '@discordjs/builders@1.14.1':
     resolution: {integrity: sha512-gSKkhXLqs96TCzk66VZuHHl8z2bQMJFGwrXC0f33ngK+FLNau4hU1PYny3DNJfNdSH+gVMzE85/d5FQ2BpcNwQ==}
@@ -640,6 +638,11 @@ packages:
   '@workflow/serde@4.1.0-beta.2':
     resolution: {integrity: sha512-8kkeoQKLDaKXefjV5dbhBj2aErfKp1Mc4pb6tj8144cF+Em5SPbyMbyLCHp+BVrFfFVCBluCtMx+jjvaFVZGww==}
 
+  '@yaonyan/chat-adapter-weixin@file:../chat-adapter-weixin':
+    resolution: {directory: ../chat-adapter-weixin, type: directory}
+    peerDependencies:
+      chat: '>=4.0.0'
+
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
     engines: {node: '>= 0.6'}
@@ -801,6 +804,10 @@ packages:
   discord.js@14.26.4:
     resolution: {integrity: sha512-4oBp8tc6Kf8IDBwAHhbsMaAqx1b5fob9SNasZT7V6yyyUydoO5i5fGuX7TmvRtR+q/WgKRnRViRoAWnG7fNyvA==}
     engines: {node: '>=18'}
+
+  dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
+    engines: {node: '>=12'}
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -1707,10 +1714,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@chat-adapter/weixin@file:../chat-adapter-weixin(chat@4.28.1)':
-    dependencies:
-      chat: 4.28.1
-
   '@discordjs/builders@1.14.1':
     dependencies:
       '@discordjs/formatters': 0.6.2
@@ -2137,6 +2140,10 @@ snapshots:
 
   '@workflow/serde@4.1.0-beta.2': {}
 
+  '@yaonyan/chat-adapter-weixin@file:../chat-adapter-weixin(chat@4.28.1)':
+    dependencies:
+      chat: 4.28.1
+
   accepts@2.0.0:
     dependencies:
       mime-types: 3.0.2
@@ -2295,6 +2302,8 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  dotenv@17.4.2: {}
 
   dunder-proto@1.0.1:
     dependencies:

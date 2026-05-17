@@ -2,24 +2,31 @@ import { createACPProvider, type ACPProvider } from "@mcpc-tech/acp-ai-provider"
 import { generateText } from "ai";
 import { Chat } from "chat";
 import { createDiscordAdapter, type DiscordAdapter } from "@chat-adapter/discord";
-import { WeixinAdapter } from "@yaonyan/chat-adapter-weixin";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import type { StateAdapter } from "chat";
 import type { Adapter } from "chat";
+import { defaultAgent, type ACPAgentConfig } from "./agents.config.js";
 
 /**
  * On Windows, npm global `.cmd` wrappers can't be spawned without `shell: true`.
- * Instead, resolve the actual node script path and spawn `node <script>` directly.
+ * Instead, resolve the actual executable path directly.
  */
-function resolveCommand(agentCmd = "codebuddy"): { command: string; extraArgs: string[] } {
+function resolveCommand(config: ACPAgentConfig): { command: string; args: string[] } {
   if (process.platform !== "win32") {
-    return { command: agentCmd, extraArgs: [] };
+    return { command: config.command, args: config.args };
   }
+  // Resolve the actual .exe to avoid .cmd wrapper spawn issues
   const npmPrefix = process.env.APPDATA
     ? `${process.env.APPDATA}\\npm`
     : `${process.env.USERPROFILE}\\AppData\\Roaming\\npm`;
-  const script = `${npmPrefix}\\node_modules\\@tencent-ai\\codebuddy-code\\bin\\${agentCmd}`;
-  return { command: process.execPath, extraArgs: [script] };
+
+  if (config.command === "opencode") {
+    const exe = `${npmPrefix}\\node_modules\\opencode-ai\\bin\\opencode.exe`;
+    return { command: exe, args: config.args };
+  }
+  // Fallback: spawn via node for script-based packages
+  const script = `${npmPrefix}\\node_modules\\@tencent-ai\\codebuddy-code\\bin\\${config.command}`;
+  return { command: process.execPath, args: [script, ...config.args] };
 }
 
 export interface CreateBotOptions {
@@ -27,13 +34,13 @@ export interface CreateBotOptions {
   provider?: ACPProvider;
   /** override the Discord adapter (useful for testing) */
   discordAdapter?: Adapter;
-  /** override the WeChat adapter (useful for testing; pass null to disable) */
+  /** override the WeChat adapter (disabled by default; pass an adapter to enable) */
   weixinAdapter?: Adapter | null;
   /** override the state adapter (useful for testing) */
   state?: StateAdapter;
-  /** ACP agent command, default "codebuddy" */
+  /** ACP agent command, default from agents.config.ts ("opencode") */
   command?: string;
-  /** ACP agent args, default ["--acp"] */
+  /** ACP agent args, default from agents.config.ts (["acp"]) */
   args?: string[];
   /**
    * Allowed guild channels in addition to DMs.
@@ -58,32 +65,32 @@ function resolveAllowedChannels(opt?: string[]): Set<string> {
 export function createBot(opts: CreateBotOptions = {}) {
   const allowedChannels = resolveAllowedChannels(opts.allowedChannels);
 
-  const { command: defaultCommand, extraArgs } = resolveCommand(opts.command);
+  const agentConfig: ACPAgentConfig = {
+    command: opts.command ?? defaultAgent.command,
+    args: opts.args ?? defaultAgent.args,
+    authMethodId: defaultAgent.authMethodId,
+    persistSession: defaultAgent.persistSession,
+    sessionDelayMs: defaultAgent.sessionDelayMs,
+  };
+  const { command, args } = resolveCommand(agentConfig);
   const provider =
     opts.provider ??
     createACPProvider({
-      command: defaultCommand,
-      args: [...extraArgs, ...(opts.args ?? ["--acp"])],
-      authMethodId: "iOA",
+      command,
+      args,
+      authMethodId: agentConfig.authMethodId,
       session: {
         cwd: process.cwd(),
         mcpServers: [],
       },
-      persistSession: true,
+      persistSession: agentConfig.persistSession,
+      sessionDelayMs: agentConfig.sessionDelayMs,
     });
 
   const discordAdapter = (opts.discordAdapter ?? createDiscordAdapter()) as DiscordAdapter;
 
-  // weixinAdapter: explicit null disables it; otherwise always enabled (reads env vars by default)
-  const weixinAdapter =
-    opts.weixinAdapter === null
-      ? null
-      : opts.weixinAdapter != null
-        ? (opts.weixinAdapter as WeixinAdapter)
-        : new WeixinAdapter();
-
   const adapters: Record<string, Adapter> = { discord: discordAdapter };
-  if (weixinAdapter) adapters.weixin = weixinAdapter;
+  if (opts.weixinAdapter) adapters.weixin = opts.weixinAdapter;
 
   const bot = new Chat({
     userName: "chat2acp-bot",
@@ -99,7 +106,7 @@ export function createBot(opts: CreateBotOptions = {}) {
     const threadId = message.threadId;
 
     // Channel whitelist: if configured, only allow listed guild channels.
-    // If empty/not set, allow all channels (like WeChat adapter).
+    // If empty/not set, allow all channels.
     if (!discordAdapter.isDM(threadId) && allowedChannels.size > 0) {
       const { guildId, channelId } = discordAdapter.decodeThreadId(threadId);
       const key = `${guildId}:${channelId}`;
@@ -125,37 +132,6 @@ export function createBot(opts: CreateBotOptions = {}) {
       await thread.post("오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     }
   });
-
-  // ── WeChat mention handler ───────────────────────────────────────────────────
-  if (weixinAdapter) {
-    bot.onNewMention(async (thread, message) => {
-      // Only handle WeChat messages in this handler
-      if (thread.adapter.name !== "weixin") return;
-
-      const userText = message.text ?? "";
-      console.log(`[WeChat] Received message: ${userText}`);
-
-      try {
-        console.log("[WeChat] Calling generateText...");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await generateText({
-          model: provider.languageModel() as any,
-          prompt: userText,
-          tools: provider.tools as any,
-        });
-        console.log(`[WeChat] generateText done, reply: ${result.text.slice(0, 80)}`);
-        try {
-          await thread.post(result.text);
-          console.log("[WeChat] thread.post done");
-        } catch (postErr) {
-          console.error("[WeChat] thread.post error:", postErr);
-        }
-      } catch (err) {
-        console.error("[ACP] WeChat error:", err);
-        await thread.post("오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-      }
-    });
-  }
 
   return { bot, provider, discordAdapter };
 }
