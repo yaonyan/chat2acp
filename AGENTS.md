@@ -12,9 +12,6 @@ chat2acp bridges any **chat platform** (Discord, Telegram, Slack, WeChat) to any
 Chat Platform (Discord/Telegram/Slack/WeChat)
     │
     ▼
-Chat Platform (Discord/Telegram/Slack/WeChat)
-    │
-    ▼
 Chat SDK (`chat` package)  ←  handles messages, mentions, threads
     │
     ▼
@@ -46,6 +43,7 @@ OpenCode / CodeBuddy / Claude  ←  the actual AI agent (ACP subprocess)
 | `src/agents.config.ts` | **Agent config** — defines `ACPAgentConfig` interface and `AGENTS` registry of 10 ACP-compatible agents. `resolveAgent()` picks via `ACP_AGENT` env var, defaults to OpenCode. |
 | `src/adapters/index.ts` | **Adapter wrapper dispatch** — maps adapter name to platform-specific wrapper. Falls through if no wrapper exists. |
 | `src/adapters/telegram/index.ts` | **Telegram wrapper** — keeps typing indicator alive during streaming (4s interval, stops 2s after last edit). |
+| `src/adapters/weixin/index.ts` | **WeChat wrapper** — implements `.stream` to send each chunk as a separate message (WeChat doesn't support message editing). |
 | `src/stream-utils.ts` | **Stream formatter** — `streamWithToolCalls()` wraps the AI SDK `fullStream`, rendering tool calls as code blocks and deduplicating `in_progress` updates. |
 | `src/__tests__/bot.e2e.test.ts` | **Integration tests** — mocks `ai` + `@mcpc-tech/acp-ai-provider`, tests mention handler via `chat.handleIncomingMessage()`. |
 | `src/test-utils.ts` | **Test helpers** — `createMockAdapter`, `createMockState`, `createTestMessage`. |
