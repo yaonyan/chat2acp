@@ -1,5 +1,10 @@
 import type { Adapter } from "chat";
 
+/**
+ * WeixinAdapter does not support editMessage or native streaming.
+ * The chat SDK's fallbackStream (post + edit) doesn't work.
+ * By implementing .stream, each chunk from the iterator becomes a new message.
+ */
 export function wrapWeixinAdapter(adapter: Adapter): Adapter {
   const origPost = adapter.postMessage.bind(adapter);
 

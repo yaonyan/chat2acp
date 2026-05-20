@@ -56,9 +56,7 @@ console.error = (...args) => { _error(...args); writeLog("ERR " + args.map(Strin
 
 function spawnBot(): ChildProcess {
   // Resolve tsx executable directly to avoid .cmd wrapper issues on Windows
-  const tsxBin = process.platform === "win32"
-    ? resolve(process.cwd(), "node_modules/tsx/dist/cli.mjs")
-    : resolve(process.cwd(), "node_modules/.bin/tsx");
+  const tsxBin = resolve(process.cwd(), "node_modules/tsx/dist/cli.mjs");
   const child = spawn(process.execPath, [tsxBin, "src/index.ts"], {
     stdio: ["ignore", "pipe", "pipe"],
     cwd: process.cwd(),
